@@ -1,0 +1,140 @@
+import uuid
+from sqlalchemy.orm import Session
+from ..models import GameSession
+from .vocab_service import (
+    vocab_preview,
+    vocab_listen_click,
+    vocab_result
+)
+
+# --------------------------------------------------
+# START VOCAB SESSION (PART 0: PREVIEW)
+# --------------------------------------------------
+def start_vocab_session(db: Session, user_id: int, category: str):
+    """
+    Initializes a new Vocabulary session.
+    PART FLOW:
+    0 = Preview
+    1 = Listen & Click
+    2 = Results
+    """
+
+    preview_data = vocab_preview(category)
+    if not preview_data:
+        raise ValueError("Invalid category")
+
+    session = GameSession(
+        session_id=str(uuid.uuid4()),
+        user_id=user_id,
+        game_type="vocab",
+        category=category,
+        current_part=0,          # PREVIEW
+        current_index=0,
+        score=0,
+        total_questions=0,
+        questions=[],
+        answers=[],
+        status="active"
+    )
+
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return {
+        "session_id": session.session_id,
+        "part": 0,
+        "preview": preview_data
+    }
+
+
+# --------------------------------------------------
+# MOVE TO PART 1: LISTEN & CLICK
+# --------------------------------------------------
+def start_listen_click(db: Session, session: GameSession):
+    """
+    Generates questions ONLY when entering PART 1
+    """
+    questions = vocab_listen_click(session.category, count=10)
+
+    if not questions:
+        raise ValueError("Failed to generate questions")
+
+    session.questions = questions
+    session.total_questions = len(questions)
+    session.current_index = 0
+    session.current_part = 1   # LISTEN & CLICK
+
+    db.commit()
+    db.refresh(session)
+
+    return {
+        "part": 1,
+        "total_questions": session.total_questions,
+        "question": session.questions[0]
+    }
+
+
+# --------------------------------------------------
+# GET CURRENT QUESTION (PART 1)
+# --------------------------------------------------
+def get_current_question(session: GameSession):
+    if session.current_part != 1:
+        raise ValueError("Not in Listen & Click part")
+
+    return session.questions[session.current_index]
+
+
+# --------------------------------------------------
+# SUBMIT ANSWER (PART 1)
+# --------------------------------------------------
+def submit_vocab_answer(
+    db: Session,
+    session: GameSession,
+    selected_word: str
+):
+    if session.current_part != 1:
+        raise ValueError("Invalid game state")
+
+    question = session.questions[session.current_index]
+    correct = selected_word == question["target_word"]
+
+    session.answers.append({
+        "question_id": question["question_id"],
+        "correct_word": question["target_word"],
+        "selected_word": selected_word,
+        "correct": correct
+    })
+
+    if correct:
+        session.score += 1   # +1 per correct (as per your rules)
+
+    session.current_index += 1
+
+    # Finished all questions → move to RESULTS
+    if session.current_index >= session.total_questions:
+        session.current_part = 2
+        session.status = "completed"
+
+        result = vocab_result(
+            score=session.score,
+            total=session.total_questions
+        )
+
+        db.commit()
+        db.refresh(session)
+
+        return {
+            "completed": True,
+            "result": result,
+            "answers": session.answers
+        }
+
+    db.commit()
+    db.refresh(session)
+
+    return {
+        "completed": False,
+        "correct": correct,
+        "next_question": session.questions[session.current_index]
+    }
