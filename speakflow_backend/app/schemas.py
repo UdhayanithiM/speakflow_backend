@@ -17,3 +17,10 @@ class UserResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class SpeakingProgressRequest(BaseModel):
+    user_id: int
+    lesson_id: int
+    dialogue_id: int
+    score: int        

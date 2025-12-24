@@ -6,7 +6,10 @@ from sqlalchemy import (
     String,
     JSON,
     DateTime,
-    Date
+    Date,
+    ForeignKey,
+    Float,
+    Boolean
 )
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -81,3 +84,35 @@ class GameSession(Base):
         server_default=func.now(),
         nullable=False
     )
+
+
+# --------------------------------------------------
+# SPEAKING LESSON PROGRESS
+# --------------------------------------------------
+class SpeakingLessonProgress(Base):
+    __tablename__ = "speaking_lesson_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    lesson_id = Column(Integer, nullable=False)  # Maps to speaking_data.py
+
+    is_completed = Column(Boolean, default=False, nullable=False)
+    is_locked = Column(Boolean, default=True, nullable=False)
+    progress_percent = Column(Float, default=0.0, nullable=False)
+
+
+# --------------------------------------------------
+# SPEAKING DIALOGUE PROGRESS
+# --------------------------------------------------
+class SpeakingDialogueProgress(Base):
+    __tablename__ = "speaking_dialogue_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    lesson_id = Column(Integer, nullable=False)
+    dialogue_id = Column(Integer, nullable=False)  # Maps to speaking_data.py
+
+    score = Column(Integer, nullable=True)
+    audio_url = Column(String, nullable=True)

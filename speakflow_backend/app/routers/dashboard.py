@@ -5,7 +5,6 @@ from .. import database, models
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
-
 @router.get("/{user_id}")
 def get_dashboard(user_id: int, db: Session = Depends(database.get_db)):
     # 1. Fetch User
@@ -13,16 +12,16 @@ def get_dashboard(user_id: int, db: Session = Depends(database.get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 2. LEVEL CALCULATION (1000 XP = 1 level)
+    # 2. LEVEL CALCULATION
     current_level = (user.total_xp // 1000) + 1
     xp_for_next_level = 1000
     current_level_xp = user.total_xp % xp_for_next_level
     level_progress = current_level_xp / xp_for_next_level
 
-    # 3. TODAY COMPLETION FLAG (important for XP abuse prevention)
+    # 3. TODAY COMPLETION FLAG
     today_completed = user.last_active_date == date.today()
 
-    # 4. MODULE DEFINITIONS (server-controlled locks)
+    # 4. MODULE DEFINITIONS
     modules = [
         {
             "id": "vocab",
@@ -43,20 +42,20 @@ def get_dashboard(user_id: int, db: Session = Depends(database.get_db)):
             "title": "Grammar",
             "subtitle": "Master the rules",
             "icon": "edit",
-            "locked": current_level < 3  # unlock at level 3
+            "locked": False  # ✅ CHANGED FROM (current_level < 3) TO False
         },
         {
             "id": "situations",
             "title": "Situations",
             "subtitle": "Real-life scenarios",
             "icon": "chat",
-            "locked": False
+            "locked": False # Keep this locked until we build it
         }
     ]
 
     return {
         "user_name": user.username,
-        "current_streak": user.current_streak,
+        "day_streak": user.current_streak, # Ensure key name matches Android (day_streak vs current_streak)
         "total_xp": user.total_xp,
         "current_level": current_level,
         "level_progress": level_progress,
